@@ -1,0 +1,7 @@
+Bu bir test dosyasıdır.
+
+Türkçe çeviri testi için kullanılacak.
+
+Bu dosya .txt formatında ve desteklenen bir dosya türüdür.
+
+Çeviri işlemi sonrasında sağ panelde görünmesi gerekiyor.

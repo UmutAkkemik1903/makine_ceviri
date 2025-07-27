@@ -1,0 +1,23 @@
+{
+  "menu": {
+    "file": "Dosya",
+    "edit": "Düzenle",
+    "view": "Görünüm",
+    "help": "Yardım",
+    "settings": "Ayarlar"
+  },
+  "dialog": {
+    "ok": "Tamam",
+    "cancel": "İptal",
+    "yes": "Evet",
+    "no": "Hayır",
+    "save": "Kaydet",
+    "open": "Aç"
+  },
+  "messages": {
+    "welcome": "Hoş geldiniz!",
+    "goodbye": "Güle güle!",
+    "error": "Bir hata oluştu",
+    "success": "İşlem başarılı"
+  }
+}

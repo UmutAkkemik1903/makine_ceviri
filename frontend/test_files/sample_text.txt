@@ -1,0 +1,11 @@
+Bu basit bir metin dosyasıdır.
+
+Oyunlarda genellikle hikaye metinleri, açıklamalar ve diğer içerikler
+bu tür dosyalarda tutulur.
+
+Birden fazla satır içerebilir ve çeviri işlemi için uygundur.
+
+Bu dosya test amaçlıdır ve çeviri işlemlerinin nasıl çalıştığını
+göstermek için kullanılacaktır.
+
+Türkçe karakterler de desteklenmektedir: ç, ğ, ı, ö, ş, ü

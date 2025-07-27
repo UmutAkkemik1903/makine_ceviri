@@ -1,0 +1,36 @@
+# Oyun Metinleri - Türkçe
+start_game=Oyunu Başlat
+continue_game=Oyuna Devam Et
+new_game=Yeni Oyun
+load_game=Oyun Yükle
+save_game=Oyun Kaydet
+settings=Ayarlar
+quit_game=Çıkış
+
+# Ana Menü
+main_menu=Ana Menü
+options=Seçenekler
+credits=Yapımcılar
+exit=Çıkış
+
+# Oyun İçi Mesajlar
+health=Sağlık
+mana=Mana
+level=Seviye
+experience=Deneyim
+gold=Altın
+inventory=Envanter
+
+# Aksiyonlar
+attack=Saldır
+defend=Savun
+use_item=Eşya Kullan
+cast_spell=Büyü Yap
+run_away=Kaç
+
+# Sistem Mesajları
+game_saved=Oyun kaydedildi!
+game_loaded=Oyun yüklendi!
+invalid_action=Geçersiz hareket!
+not_enough_mana=Yeterli mana yok!
+item_used=Eşya kullanıldı!
