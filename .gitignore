@@ -1,0 +1,17 @@
+# Images - demo files
+**/demo_panel_*.png
+
+# Temporary files
+*.tmp
+*.temp
+/tmp/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# System files
+.DS_Store
+Thumbs.db
