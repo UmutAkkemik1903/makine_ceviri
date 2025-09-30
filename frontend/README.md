@@ -7,7 +7,11 @@ Modern bir masaüstü uygulaması ile dosya çeviri işlemlerini kolaylaştırı
 - 🗂️ **Klasör Tabanlı Dosya Yönetimi**: Windows Explorer benzeri dosya ağacı görünümü
 - 📄 **Çoklu Format Desteği**: TXT, JSON, XML, INI, CFG, Properties, Lang, YML, YAML dosyaları
 - 🎨 **Modern Arayüz**: Dark/Light tema desteği ile modern CustomTkinter tasarımı
-- 🔄 **Anlık Çeviri**: Seçilen dosyaların anlık çevirisi
+- 🧭 **Akıllı Klasör Gezinme**: Klasör durum kartları ve tek tıkla kılavuz/günlük kısayolları
+- � **Anlık Arama**: Dosya ağacında yazarken filtreleme ve eşleşmeleri vurgulama
+- �🔄 **Anlık Çeviri**: Seçilen dosyaların anlık çevirisi
+- 📊 **Canlı İstatistikler**: Orijinal ve çevrilmiş içerik için satır/karakter sayacı
+- 📋 **Tek Tıkla Kopyalama**: Orijinal veya çevrilmiş metni panoya aktarma
 - 📤 **Toplu Dışa Aktarma**: Çevrilmiş dosyaları tek seferde dışa aktarma
 - ✅ **Seçici İşlem**: Checkbox ile istediğiniz dosyaları seçerek işlem yapma
 
@@ -29,7 +33,7 @@ python main.py
 ### Adım Adım Kullanım:
 
 1. **Klasör Seç**: Sol panelden "Klasör Seç" butonuna tıklayarak çevirmek istediğiniz dosyaları içeren klasörü seçin
-2. **Dosya Seç**: Dosya ağacından çevirmek istediğiniz dosyaya tıklayın (desteklenen formatlar yeşil renkle gösterilir)
+2. **Dosya Seç veya Ara**: Dosya ağacından çevirmek istediğiniz dosyaya tıklayın ya da üstteki arama alanıyla doğrudan filtreleyin (desteklenen formatlar yeşil renkle gösterilir)
 3. **İçeriği İncele**: Orta panelde dosyanın orijinal içeriği görüntülenir
 4. **Çevir**: "Çevir" butonuna tıklayarak çeviri işlemini başlatın
 5. **Sonucu Görüntüle**: Sağ panelde çevrilmiş içerik görüntülenir
