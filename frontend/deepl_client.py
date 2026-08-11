@@ -21,6 +21,7 @@ DEFAULT_BASE_URL = "https://api.deepl.com/v2"
 FREE_BASE_URL = "https://api-free.deepl.com/v2"
 TRANSLATE_PATH = "/translate"
 REPHRASE_PATH = "/write/rephrase"
+MAX_TEXT_ITEMS_PER_REQUEST = 50
 
 
 class DeepLClient:
@@ -87,6 +88,36 @@ class DeepLClient:
         """Translate text into the desired target language."""
         is_sequence = isinstance(text, Sequence) and not isinstance(text, (str, bytes))
         text_payload: List[str] = [str(item) for item in text] if is_sequence else [str(text)]
+
+        if is_sequence and not text_payload:
+            return []
+
+        translated_values: List[str] = []
+        for start_index in range(0, len(text_payload), MAX_TEXT_ITEMS_PER_REQUEST):
+            batch = text_payload[start_index:start_index + MAX_TEXT_ITEMS_PER_REQUEST]
+            translated_values.extend(
+                self._translate_text_batch(
+                    batch,
+                    target_lang=target_lang,
+                    source_lang=source_lang,
+                    preserve_formatting=preserve_formatting,
+                    formality=formality,
+                )
+            )
+
+        if is_sequence:
+            return translated_values
+        return translated_values[0]
+
+    def _translate_text_batch(
+        self,
+        text_payload: List[str],
+        *,
+        target_lang: str,
+        source_lang: Optional[str] = None,
+        preserve_formatting: bool = True,
+        formality: Optional[str] = None,
+    ) -> List[str]:
         payload: Dict[str, Any] = {
             "text": text_payload,
             "target_lang": target_lang,
@@ -107,9 +138,9 @@ class DeepLClient:
         if not translations:
             raise RuntimeError("DeepL translation response did not contain any results")
         translated_values = [item.get("text", "") for item in translations]
-        if is_sequence:
-            return translated_values
-        return translated_values[0]
+        if len(translated_values) != len(text_payload):
+            raise RuntimeError("DeepL translation response count did not match request count")
+        return translated_values
 
     def rephrase_text(
         self,

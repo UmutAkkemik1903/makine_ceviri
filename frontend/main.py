@@ -11,26 +11,58 @@ import webbrowser
 
 from deepl_client import build_client_from_env
 
+
+# --- Görsel sistem: taş zemin + kömür ray + bakır vurgu (kart paneli değil, atölye) ---
+class Tema:
+    tuval = "#E6E1D8"
+    yuzey = "#FAF8F4"
+    yuzey_alt = "#F1EDE4"
+    ray = "#171412"
+    ray_yazi = "#F5F0E8"
+    ray_soluk = "#A8A29E"
+    mucur = "#1C1917"
+    soluk = "#78716C"
+    cizgi = "#D6D0C4"
+    vurgu = "#C2410C"
+    vurgu_hover = "#9A3412"
+    vurgu_yazi = "#FFF7ED"
+    basari = "#0F766E"
+    tehlikeli = "#B91C1C"
+    editor = "#FFFEFB"
+    editor_koyu = "#1A1816"
+    eslesme_acik = "#FED7AA"
+    eslesme_koyu = "#7C2D12"
+
+    @staticmethod
+    def font(boyut=13, kalin=False, mono=False):
+        agaliga = "Menlo" if mono else "Avenir Next"
+        yedek = "Menlo" if mono else "Helvetica Neue"
+        try:
+            return ctk.CTkFont(family=agaliga, size=boyut, weight="bold" if kalin else "normal")
+        except Exception:
+            return ctk.CTkFont(family=yedek, size=boyut, weight="bold" if kalin else "normal")
+
+
 class FileTranslatorApp(ctk.CTk):
     def __init__(self):
         super().__init__()
-        
-        # Uygulama ayarları
-        self.title("Makine Çeviri - Dosya Çeviricisi")
-        self.geometry("1600x900")
-        self.minsize(1400, 800)
-        
-        # Tema ayarları
-        ctk.set_appearance_mode("dark")
-        ctk.set_default_color_theme("blue")
-        
-        # Ana değişkenler
+
+        self.title("MAKİNE — Dosya Çeviri Atölyesi")
+        self.geometry("1480x900")
+        self.minsize(1180, 720)
+        self.configure(fg_color=Tema.tuval)
+
+        ctk.set_appearance_mode("light")
+        ctk.set_default_color_theme("green")
+
         self.current_directory = None
         self.selected_file = None
         self.translated_files = {}
-        self.supported_formats = ['.txt', '.json', '.xml', '.ini', '.cfg', '.properties', '.lang', '.yml', '.yaml']
+        self.supported_formats = [
+            ".txt", ".json", ".xml", ".ini", ".cfg",
+            ".properties", ".lang", ".yml", ".yaml",
+        ]
 
-        # Dil seçenekleri (hedef ve kaynak)
         self.target_languages = {
             "Türkçe (TR)": "TR",
             "İngilizce (EN)": "EN",
@@ -55,141 +87,612 @@ class FileTranslatorApp(ctk.CTk):
         self.source_lang_var = tk.StringVar(value="Otomatik (Algıla)")
         self.translation_client = None
 
-        # UI durum değişkenleri
         self.search_var = tk.StringVar()
-        self.search_result_var = tk.StringVar(value="Filtre: tüm dosyalar")
-        self.folder_badge_text = tk.StringVar(value="Klasör: -")
-        self.translation_badge_text = tk.StringVar(value="Çevrilen dosya: 0")
-        self.original_stats_text = tk.StringVar(value="Satır: 0    Karakter: 0")
-        self.translated_stats_text = tk.StringVar(value="Satır: 0    Karakter: 0")
-        
+        self.search_result_var = tk.StringVar(value="Tüm dosyalar görünür")
+        self.folder_badge_text = tk.StringVar(value="Klasör seçilmedi")
+        self.translation_badge_text = tk.StringVar(value="0 çıktı")
+        self.original_stats_text = tk.StringVar(value="—")
+        self.translated_stats_text = tk.StringVar(value="—")
+
         self.setup_ui()
         self.initialize_translation_client()
-        
-    def setup_treeview_style(self):
-        """TreeView stillerini başlangıçta ayarla"""
+
+    def setup_treeview_style(self, mode="light"):
+        """Ağaç stillerini görsel sisteme bağla"""
         style = ttk.Style()
         style.theme_use("clam")
-        
-        # Başlangıçta dark mode (varsayılan)
-        style.configure("Treeview", 
-                       background="#2b2b2b",
-                       foreground="white",
-                       rowheight=25,
-                       fieldbackground="#2b2b2b")
-        style.configure("Treeview.Heading",
-                       background="#1f538d",
-                       foreground="white",
-                       relief="flat")
-        style.map("Treeview",
-                 background=[('selected', '#1f538d')])
-        
+        if mode == "light":
+            style.configure(
+                "Atolye.Treeview",
+                background=Tema.editor,
+                foreground=Tema.mucur,
+                fieldbackground=Tema.editor,
+                rowheight=28,
+                borderwidth=0,
+                font=("Menlo", 11),
+            )
+            style.configure(
+                "Atolye.Treeview.Heading",
+                background=Tema.yuzey_alt,
+                foreground=Tema.mucur,
+                relief="flat",
+                font=("Avenir Next", 11, "bold"),
+            )
+            style.map(
+                "Atolye.Treeview",
+                background=[("selected", Tema.vurgu)],
+                foreground=[("selected", Tema.vurgu_yazi)],
+            )
+        else:
+            style.configure(
+                "Atolye.Treeview",
+                background=Tema.editor_koyu,
+                foreground="#F5F0E8",
+                fieldbackground=Tema.editor_koyu,
+                rowheight=28,
+                borderwidth=0,
+                font=("Menlo", 11),
+            )
+            style.configure(
+                "Atolye.Treeview.Heading",
+                background="#2A2522",
+                foreground="#F5F0E8",
+                relief="flat",
+                font=("Avenir Next", 11, "bold"),
+            )
+            style.map(
+                "Atolye.Treeview",
+                background=[("selected", Tema.vurgu)],
+                foreground=[("selected", Tema.vurgu_yazi)],
+            )
+
     def setup_ui(self):
-        """Ana UI düzenlemesi"""
-        # Ana grid yapılandırması - 4 eşit sütun
-        self.grid_columnconfigure(0, weight=1)  # Sol panel - Orijinal dosya ağacı
-        self.grid_columnconfigure(1, weight=1)  # Orta-sol panel - Orijinal önizleme
-        self.grid_columnconfigure(2, weight=1)  # Orta-sağ panel - Çeviri önizleme
-        self.grid_columnconfigure(3, weight=1)  # Sağ panel - Çeviri dosya ağacı
-        self.grid_rowconfigure(0, weight=0)     # Üst başlık
-        self.grid_rowconfigure(1, weight=1)     # Ana içerik
-        self.grid_rowconfigure(2, weight=0)     # Alt kontroller
+        """Atölye düzeni: komut şeridi + sol ray + çift editör + durum şeridi"""
+        self.grid_columnconfigure(0, weight=0, minsize=300)
+        self.grid_columnconfigure(1, weight=1)
+        self.grid_rowconfigure(0, weight=0)
+        self.grid_rowconfigure(1, weight=1)
+        self.grid_rowconfigure(2, weight=0)
 
-        # Üst bilgi paneli
-        self.create_header()
+        self.create_command_bar()
+        self.create_side_rail()
+        self.create_workspace()
+        self.create_status_bar()
 
-        # Panelleri oluştur
-        self.create_left_panel()           # Orijinal dosya ağacı
-        self.create_middle_left_panel()    # Orijinal dosya önizleme
-        self.create_middle_right_panel()   # Çeviri önizleme
-        self.create_right_panel()          # Çeviri dosya ağacı
+    def create_command_bar(self):
+        """Üst komut şeridi — marka + dil çifti + birincil eylemler"""
+        bar = ctk.CTkFrame(self, fg_color=Tema.ray, corner_radius=0, height=72)
+        bar.grid(row=0, column=0, columnspan=2, sticky="ew")
+        bar.grid_propagate(False)
+        bar.grid_columnconfigure(1, weight=1)
 
-        # Alt panel - Kontroller
-        self.create_bottom_panel()
+        marka = ctk.CTkFrame(bar, fg_color="transparent")
+        marka.grid(row=0, column=0, padx=(28, 16), pady=14, sticky="w")
 
-    def create_header(self):
-        """Üst bilgi paneli"""
-        self.header_frame = ctk.CTkFrame(self)
-        self.header_frame.grid(row=0, column=0, columnspan=4, padx=10, pady=(10, 5), sticky="ew")
-        self.header_frame.grid_columnconfigure(0, weight=1)
-        self.header_frame.grid_columnconfigure(1, weight=1)
-        self.header_frame.grid_columnconfigure(2, weight=0)
+        ctk.CTkLabel(
+            marka,
+            text="MAKİNE",
+            font=Tema.font(26, kalin=True),
+            text_color=Tema.ray_yazi,
+        ).grid(row=0, column=0, sticky="w")
+        ctk.CTkLabel(
+            marka,
+            text="dosya çeviri atölyesi",
+            font=Tema.font(12),
+            text_color=Tema.ray_soluk,
+        ).grid(row=1, column=0, sticky="w", pady=(2, 0))
 
-        # Başlık ve alt başlık
-        title_container = ctk.CTkFrame(self.header_frame, fg_color="transparent")
-        title_container.grid(row=0, column=0, sticky="w")
+        dil_alani = ctk.CTkFrame(bar, fg_color="#221E1B", corner_radius=8)
+        dil_alani.grid(row=0, column=1, padx=8, pady=14, sticky="w")
 
-        app_title = ctk.CTkLabel(
-            title_container,
-            text="Makine Çeviri Paneli",
-            font=ctk.CTkFont(size=24, weight="bold")
+        ctk.CTkLabel(
+            dil_alani,
+            text="KAYNAK",
+            font=Tema.font(10, kalin=True),
+            text_color=Tema.ray_soluk,
+        ).grid(row=0, column=0, padx=(14, 6), pady=(10, 0), sticky="w")
+        ctk.CTkLabel(
+            dil_alani,
+            text="HEDEF",
+            font=Tema.font(10, kalin=True),
+            text_color=Tema.ray_soluk,
+        ).grid(row=0, column=2, padx=(6, 14), pady=(10, 0), sticky="w")
+
+        self.source_lang_menu = ctk.CTkOptionMenu(
+            dil_alani,
+            variable=self.source_lang_var,
+            values=list(self.source_languages.keys()),
+            width=170,
+            height=30,
+            fg_color="#2F2926",
+            button_color=Tema.vurgu,
+            button_hover_color=Tema.vurgu_hover,
+            dropdown_fg_color="#2F2926",
+            dropdown_hover_color=Tema.vurgu,
+            text_color=Tema.ray_yazi,
+            font=Tema.font(12),
         )
-        app_title.grid(row=0, column=0, sticky="w")
+        self.source_lang_menu.grid(row=1, column=0, padx=(14, 6), pady=(2, 12))
 
-        app_subtitle = ctk.CTkLabel(
-            title_container,
-            text="Dosyalarınızı tek tıkla keşfedin, önizleyin ve çevirin",
-            font=ctk.CTkFont(size=13),
-            text_color=("#475569", "#cbd5ff")
+        ctk.CTkLabel(
+            dil_alani,
+            text="→",
+            font=Tema.font(18, kalin=True),
+            text_color=Tema.vurgu,
+        ).grid(row=1, column=1, padx=4, pady=(2, 12))
+
+        self.target_lang_menu = ctk.CTkOptionMenu(
+            dil_alani,
+            variable=self.target_lang_var,
+            values=list(self.target_languages.keys()),
+            width=170,
+            height=30,
+            fg_color="#2F2926",
+            button_color=Tema.vurgu,
+            button_hover_color=Tema.vurgu_hover,
+            dropdown_fg_color="#2F2926",
+            dropdown_hover_color=Tema.vurgu,
+            text_color=Tema.ray_yazi,
+            font=Tema.font(12),
         )
-        app_subtitle.grid(row=1, column=0, pady=(4, 0), sticky="w")
+        self.target_lang_menu.grid(row=1, column=2, padx=(6, 14), pady=(2, 12))
 
-        # Durum kartları
-        stats_container = ctk.CTkFrame(self.header_frame, fg_color="transparent")
-        stats_container.grid(row=0, column=1, padx=10, sticky="ew")
-        stats_container.grid_columnconfigure((0, 1), weight=1)
+        eylemler = ctk.CTkFrame(bar, fg_color="transparent")
+        eylemler.grid(row=0, column=2, padx=(8, 24), pady=14, sticky="e")
 
-        folder_card = ctk.CTkFrame(stats_container, corner_radius=12, fg_color=("#f8fafc", "#1f2933"))
-        folder_card.grid(row=0, column=0, padx=(0, 6), sticky="ew")
-        folder_card.grid_columnconfigure(1, weight=1)
-        folder_icon = ctk.CTkLabel(folder_card, text="📁", font=ctk.CTkFont(size=18))
-        folder_icon.grid(row=0, column=0, padx=(12, 6), pady=10)
-        folder_value = ctk.CTkLabel(
-            folder_card,
-            textvariable=self.folder_badge_text,
-            font=ctk.CTkFont(size=12, weight="bold"),
-            wraplength=220,
-            justify="left",
-            text_color=("#0f172a", "#e2e8f0")
+        self.translate_all_var = ctk.BooleanVar(value=False)
+        self.translate_all_checkbox = ctk.CTkCheckBox(
+            eylemler,
+            text="Tüm desteklenenler",
+            variable=self.translate_all_var,
+            font=Tema.font(12),
+            text_color=Tema.ray_yazi,
+            fg_color=Tema.vurgu,
+            hover_color=Tema.vurgu_hover,
+            border_color=Tema.ray_soluk,
+            checkmark_color=Tema.vurgu_yazi,
         )
-        folder_value.grid(row=0, column=1, padx=(0, 12), sticky="w")
+        self.translate_all_checkbox.grid(row=0, column=0, padx=(0, 14))
 
-        translation_card = ctk.CTkFrame(stats_container, corner_radius=12, fg_color=("#f8fafc", "#1f2933"))
-        translation_card.grid(row=0, column=1, padx=(6, 0), sticky="ew")
-        translation_card.grid_columnconfigure(1, weight=1)
-        translation_icon = ctk.CTkLabel(translation_card, text="⚡", font=ctk.CTkFont(size=18))
-        translation_icon.grid(row=0, column=0, padx=(12, 6), pady=10)
-        translation_value = ctk.CTkLabel(
-            translation_card,
-            textvariable=self.translation_badge_text,
-            font=ctk.CTkFont(size=12, weight="bold"),
-            wraplength=220,
-            justify="left",
-            text_color=("#0f172a", "#e2e8f0")
+        self.translate_btn = ctk.CTkButton(
+            eylemler,
+            text="Çevir",
+            command=self.handle_translation,
+            state="disabled",
+            height=40,
+            width=110,
+            corner_radius=6,
+            fg_color=Tema.vurgu,
+            hover_color=Tema.vurgu_hover,
+            text_color=Tema.vurgu_yazi,
+            font=Tema.font(14, kalin=True),
         )
-        translation_value.grid(row=0, column=1, padx=(0, 12), sticky="w")
+        self.translate_btn.grid(row=0, column=1, padx=(0, 8))
 
-        # Hızlı aksiyonlar
-        actions_container = ctk.CTkFrame(self.header_frame, fg_color="transparent")
-        actions_container.grid(row=0, column=2, sticky="e")
-
-        guide_btn = ctk.CTkButton(
-            actions_container,
-            text="Kılavuzu Aç",
-            command=self.open_usage_guide,
-            width=120
+        self.export_btn = ctk.CTkButton(
+            eylemler,
+            text="Dışa Aktar",
+            command=self.export_files,
+            state="disabled",
+            height=40,
+            width=120,
+            corner_radius=6,
+            fg_color="transparent",
+            hover_color="#2F2926",
+            border_width=1,
+            border_color=Tema.ray_soluk,
+            text_color=Tema.ray_yazi,
+            font=Tema.font(13),
         )
-        guide_btn.grid(row=0, column=0, padx=(0, 6))
-
-        log_btn = ctk.CTkButton(
-            actions_container,
-            text="Çeviri Günlüğü",
-            command=self.open_translation_log,
-            width=140
-        )
-        log_btn.grid(row=0, column=1)
+        self.export_btn.grid(row=0, column=2)
 
         self.update_header_stats()
+
+    def create_side_rail(self):
+        """Sol ray: kaynak gezinme + çevrilmiş çıktılar"""
+        rail = ctk.CTkFrame(self, fg_color=Tema.ray, corner_radius=0, width=320)
+        rail.grid(row=1, column=0, sticky="nsew")
+        rail.grid_propagate(False)
+        rail.grid_rowconfigure(4, weight=3)
+        rail.grid_rowconfigure(7, weight=2)
+        rail.grid_columnconfigure(0, weight=1)
+        self.left_frame = rail  # geriye uyumluluk
+
+        # — Kaynak bölümü —
+        ctk.CTkLabel(
+            rail,
+            text="KAYNAK AĞACI",
+            font=Tema.font(11, kalin=True),
+            text_color=Tema.ray_soluk,
+            anchor="w",
+        ).grid(row=0, column=0, padx=20, pady=(18, 6), sticky="ew")
+
+        ust = ctk.CTkFrame(rail, fg_color="transparent")
+        ust.grid(row=1, column=0, padx=16, sticky="ew")
+        ust.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkButton(
+            ust,
+            text="Klasör Aç",
+            command=self.select_folder,
+            height=36,
+            corner_radius=6,
+            fg_color=Tema.vurgu,
+            hover_color=Tema.vurgu_hover,
+            text_color=Tema.vurgu_yazi,
+            font=Tema.font(13, kalin=True),
+        ).grid(row=0, column=0, sticky="ew", padx=(0, 6))
+
+        ctk.CTkButton(
+            ust,
+            text="Yenile",
+            command=self.refresh_current_folder,
+            height=36,
+            width=72,
+            corner_radius=6,
+            fg_color="#2F2926",
+            hover_color="#3F3733",
+            text_color=Tema.ray_yazi,
+            font=Tema.font(12),
+        ).grid(row=0, column=1)
+
+        self.folder_path_label = ctk.CTkLabel(
+            rail,
+            textvariable=self.folder_badge_text,
+            anchor="w",
+            justify="left",
+            wraplength=270,
+            font=Tema.font(11),
+            text_color=Tema.ray_soluk,
+        )
+        self.folder_path_label.grid(row=2, column=0, padx=20, pady=(10, 4), sticky="ew")
+
+        ara = ctk.CTkFrame(rail, fg_color="transparent")
+        ara.grid(row=3, column=0, padx=16, pady=(4, 6), sticky="ew")
+        ara.grid_columnconfigure(0, weight=1)
+
+        self.search_entry = ctk.CTkEntry(
+            ara,
+            textvariable=self.search_var,
+            placeholder_text="Dosya ara…",
+            height=34,
+            corner_radius=6,
+            border_width=0,
+            fg_color="#2F2926",
+            text_color=Tema.ray_yazi,
+            placeholder_text_color=Tema.ray_soluk,
+            font=Tema.font(12),
+        )
+        self.search_entry.grid(row=0, column=0, sticky="ew", padx=(0, 6))
+        self.search_entry.bind(
+            "<KeyRelease>", lambda e: self.apply_tree_search(self.search_var.get())
+        )
+
+        ctk.CTkButton(
+            ara,
+            text="×",
+            width=34,
+            height=34,
+            corner_radius=6,
+            command=self.clear_search_query,
+            fg_color="#2F2926",
+            hover_color="#3F3733",
+            text_color=Tema.ray_yazi,
+            font=Tema.font(16),
+        ).grid(row=0, column=1)
+
+        ctk.CTkLabel(
+            ara,
+            textvariable=self.search_result_var,
+            anchor="w",
+            font=Tema.font(10),
+            text_color=Tema.ray_soluk,
+        ).grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
+
+        tree_wrap = ctk.CTkFrame(rail, fg_color="#221E1B", corner_radius=8)
+        tree_wrap.grid(row=4, column=0, padx=16, pady=(4, 8), sticky="nsew")
+        tree_wrap.grid_rowconfigure(0, weight=1)
+        tree_wrap.grid_columnconfigure(0, weight=1)
+
+        self.setup_treeview_style("light")
+        self.file_tree = ttk.Treeview(
+            tree_wrap, show="tree headings", columns=("type",), style="Atolye.Treeview"
+        )
+        self.file_tree.heading("#0", text="Dosya / klasör")
+        self.file_tree.heading("type", text="Tür")
+        self.file_tree.column("#0", width=170, stretch=True)
+        self.file_tree.column("type", width=90, stretch=False)
+
+        sb = ttk.Scrollbar(tree_wrap, orient="vertical", command=self.file_tree.yview)
+        self.file_tree.configure(yscrollcommand=sb.set)
+        self.file_tree.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
+        sb.grid(row=0, column=1, sticky="ns", pady=4)
+        self.file_tree.bind("<<TreeviewSelect>>", self.on_file_select)
+        self.update_match_tag_style("light")
+
+        # — Çıktı bölümü —
+        ayirici = ctk.CTkFrame(rail, fg_color="#2F2926", height=1)
+        ayirici.grid(row=5, column=0, padx=16, sticky="ew")
+
+        cikti_baslik = ctk.CTkFrame(rail, fg_color="transparent")
+        cikti_baslik.grid(row=6, column=0, padx=16, pady=(12, 4), sticky="ew")
+        cikti_baslik.grid_columnconfigure(0, weight=1)
+
+        ctk.CTkLabel(
+            cikti_baslik,
+            text="ÇIKTILAR",
+            font=Tema.font(11, kalin=True),
+            text_color=Tema.ray_soluk,
+            anchor="w",
+        ).grid(row=0, column=0, sticky="w")
+
+        ctk.CTkLabel(
+            cikti_baslik,
+            textvariable=self.translation_badge_text,
+            font=Tema.font(11, kalin=True),
+            text_color=Tema.vurgu,
+        ).grid(row=0, column=1, padx=(0, 8))
+
+        ctk.CTkButton(
+            cikti_baslik,
+            text="Temizle",
+            command=self.clear_translated_files,
+            width=64,
+            height=26,
+            corner_radius=4,
+            fg_color="transparent",
+            hover_color="#2F2926",
+            border_width=1,
+            border_color=Tema.ray_soluk,
+            text_color=Tema.ray_yazi,
+            font=Tema.font(11),
+        ).grid(row=0, column=2)
+
+        self.right_frame = ctk.CTkFrame(rail, fg_color="#221E1B", corner_radius=8)
+        self.right_frame.grid(row=7, column=0, padx=16, pady=(4, 16), sticky="nsew")
+        self.right_frame.grid_rowconfigure(0, weight=1)
+        self.right_frame.grid_columnconfigure(0, weight=1)
+
+        self.translated_tree = ttk.Treeview(
+            self.right_frame,
+            show="tree headings",
+            columns=("status",),
+            style="Atolye.Treeview",
+        )
+        self.translated_tree.heading("#0", text="Dosya")
+        self.translated_tree.heading("status", text="Durum")
+        self.translated_tree.column("#0", width=170, stretch=True)
+        self.translated_tree.column("status", width=80, stretch=False)
+
+        tsb = ttk.Scrollbar(
+            self.right_frame, orient="vertical", command=self.translated_tree.yview
+        )
+        self.translated_tree.configure(yscrollcommand=tsb.set)
+        self.translated_tree.grid(row=0, column=0, sticky="nsew", padx=4, pady=4)
+        tsb.grid(row=0, column=1, sticky="ns", pady=4)
+        self.translated_tree.bind("<<TreeviewSelect>>", self.on_translated_file_select)
+
+    def create_workspace(self):
+        """Ana çalışma alanı: kaynak | çeviri yan yana"""
+        alan = ctk.CTkFrame(self, fg_color=Tema.tuval, corner_radius=0)
+        alan.grid(row=1, column=1, sticky="nsew")
+        alan.grid_columnconfigure(0, weight=1)
+        alan.grid_columnconfigure(1, weight=1)
+        alan.grid_rowconfigure(0, weight=1)
+
+        # Sol editör
+        self.middle_left_frame = ctk.CTkFrame(
+            alan, fg_color=Tema.yuzey, corner_radius=0, border_width=0
+        )
+        self.middle_left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 1))
+        self.middle_left_frame.grid_rowconfigure(1, weight=1)
+        self.middle_left_frame.grid_columnconfigure(0, weight=1)
+
+        sol_ust = ctk.CTkFrame(self.middle_left_frame, fg_color=Tema.yuzey_alt, corner_radius=0)
+        sol_ust.grid(row=0, column=0, sticky="ew")
+        sol_ust.grid_columnconfigure(0, weight=1)
+
+        meta = ctk.CTkFrame(sol_ust, fg_color="transparent")
+        meta.grid(row=0, column=0, padx=20, pady=14, sticky="w")
+
+        ctk.CTkLabel(
+            meta,
+            text="KAYNAK",
+            font=Tema.font(10, kalin=True),
+            text_color=Tema.soluk,
+        ).grid(row=0, column=0, sticky="w")
+        self.middle_left_title = ctk.CTkLabel(
+            meta,
+            text="Dosya seçilmedi",
+            font=Tema.font(16, kalin=True),
+            text_color=Tema.mucur,
+        )
+        self.middle_left_title.grid(row=1, column=0, sticky="w", pady=(2, 0))
+
+        ctk.CTkButton(
+            sol_ust,
+            text="Kopyala",
+            command=self.copy_original_to_clipboard,
+            height=32,
+            width=88,
+            corner_radius=6,
+            fg_color=Tema.mucur,
+            hover_color="#44403C",
+            text_color=Tema.yuzey,
+            font=Tema.font(12),
+        ).grid(row=0, column=1, padx=20, pady=14)
+
+        self.original_content = ctk.CTkTextbox(
+            self.middle_left_frame,
+            wrap="word",
+            corner_radius=0,
+            border_width=0,
+            fg_color=Tema.editor,
+            text_color=Tema.mucur,
+            font=Tema.font(13, mono=True),
+        )
+        self.original_content.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
+        self.original_content.bind(
+            "<KeyRelease>",
+            lambda e: self.update_original_stats(
+                self.original_content.get("1.0", "end-1c")
+            ),
+        )
+
+        sol_alt = ctk.CTkFrame(self.middle_left_frame, fg_color=Tema.yuzey_alt, corner_radius=0, height=36)
+        sol_alt.grid(row=2, column=0, sticky="ew")
+        self.original_stats_label = ctk.CTkLabel(
+            sol_alt,
+            textvariable=self.original_stats_text,
+            anchor="w",
+            font=Tema.font(11, mono=True),
+            text_color=Tema.soluk,
+        )
+        self.original_stats_label.pack(side="left", padx=20, pady=8)
+
+        # Sağ editör
+        self.middle_right_frame = ctk.CTkFrame(
+            alan, fg_color=Tema.yuzey, corner_radius=0
+        )
+        self.middle_right_frame.grid(row=0, column=1, sticky="nsew")
+        self.middle_right_frame.grid_rowconfigure(1, weight=1)
+        self.middle_right_frame.grid_columnconfigure(0, weight=1)
+
+        sag_ust = ctk.CTkFrame(self.middle_right_frame, fg_color=Tema.yuzey_alt, corner_radius=0)
+        sag_ust.grid(row=0, column=0, sticky="ew")
+        sag_ust.grid_columnconfigure(0, weight=1)
+
+        meta2 = ctk.CTkFrame(sag_ust, fg_color="transparent")
+        meta2.grid(row=0, column=0, padx=20, pady=14, sticky="w")
+
+        ctk.CTkLabel(
+            meta2,
+            text="ÇEVİRİ",
+            font=Tema.font(10, kalin=True),
+            text_color=Tema.soluk,
+        ).grid(row=0, column=0, sticky="w")
+        self.middle_right_title = ctk.CTkLabel(
+            meta2,
+            text="Henüz çeviri yok",
+            font=Tema.font(16, kalin=True),
+            text_color=Tema.mucur,
+        )
+        self.middle_right_title.grid(row=1, column=0, sticky="w", pady=(2, 0))
+
+        ctk.CTkButton(
+            sag_ust,
+            text="Kopyala",
+            command=self.copy_translated_to_clipboard,
+            height=32,
+            width=88,
+            corner_radius=6,
+            fg_color=Tema.basari,
+            hover_color="#0D9488",
+            text_color="#ECFDF5",
+            font=Tema.font(12),
+        ).grid(row=0, column=1, padx=20, pady=14)
+
+        self.translated_preview = ctk.CTkTextbox(
+            self.middle_right_frame,
+            wrap="word",
+            corner_radius=0,
+            border_width=0,
+            fg_color=Tema.editor,
+            text_color=Tema.mucur,
+            font=Tema.font(13, mono=True),
+            state="normal",
+        )
+        self.translated_preview.grid(row=1, column=0, sticky="nsew")
+        self.translated_preview.bind(
+            "<KeyRelease>",
+            lambda e: self.update_translated_stats(
+                self.translated_preview.get("1.0", "end-1c")
+            ),
+        )
+
+        sag_alt = ctk.CTkFrame(self.middle_right_frame, fg_color=Tema.yuzey_alt, corner_radius=0, height=36)
+        sag_alt.grid(row=2, column=0, sticky="ew")
+        self.translated_stats_label = ctk.CTkLabel(
+            sag_alt,
+            textvariable=self.translated_stats_text,
+            anchor="w",
+            font=Tema.font(11, mono=True),
+            text_color=Tema.soluk,
+        )
+        self.translated_stats_label.pack(side="left", padx=20, pady=8)
+
+    def create_status_bar(self):
+        """Alt durum şeridi"""
+        self.bottom_frame = ctk.CTkFrame(self, fg_color=Tema.yuzey, corner_radius=0, height=48)
+        self.bottom_frame.grid(row=2, column=0, columnspan=2, sticky="ew")
+        self.bottom_frame.grid_propagate(False)
+        self.bottom_frame.grid_columnconfigure(2, weight=1)
+
+        self.theme_switch = ctk.CTkSwitch(
+            self.bottom_frame,
+            text="Koyu yüzey",
+            command=self.toggle_theme,
+            font=Tema.font(12),
+            text_color=Tema.mucur,
+            progress_color=Tema.vurgu,
+            button_color=Tema.mucur,
+            button_hover_color=Tema.vurgu,
+        )
+        self.theme_switch.grid(row=0, column=0, padx=(20, 12), pady=10)
+
+        self.progress_bar = ctk.CTkProgressBar(
+            self.bottom_frame,
+            width=160,
+            height=8,
+            corner_radius=4,
+            progress_color=Tema.vurgu,
+            fg_color=Tema.cizgi,
+        )
+        self.progress_bar.grid(row=0, column=1, padx=8, pady=10)
+        self.progress_bar.set(0)
+
+        self.status_label = ctk.CTkLabel(
+            self.bottom_frame,
+            text="Klasör açarak başlayın",
+            anchor="w",
+            font=Tema.font(12),
+            text_color=Tema.soluk,
+        )
+        self.status_label.grid(row=0, column=2, padx=12, pady=10, sticky="ew")
+
+        yardim = ctk.CTkFrame(self.bottom_frame, fg_color="transparent")
+        yardim.grid(row=0, column=3, padx=(8, 16), pady=8, sticky="e")
+
+        ctk.CTkButton(
+            yardim,
+            text="Kılavuz",
+            command=self.open_usage_guide,
+            height=28,
+            width=80,
+            corner_radius=4,
+            fg_color="transparent",
+            hover_color=Tema.yuzey_alt,
+            border_width=1,
+            border_color=Tema.cizgi,
+            text_color=Tema.mucur,
+            font=Tema.font(11),
+        ).grid(row=0, column=0, padx=(0, 6))
+
+        ctk.CTkButton(
+            yardim,
+            text="Günlük",
+            command=self.open_translation_log,
+            height=28,
+            width=80,
+            corner_radius=4,
+            fg_color="transparent",
+            hover_color=Tema.yuzey_alt,
+            border_width=1,
+            border_color=Tema.cizgi,
+            text_color=Tema.mucur,
+            font=Tema.font(11),
+        ).grid(row=0, column=1)
+
 
     def _open_path_with_default_app(self, path: Path, title: str):
         """Belirtilen dosyayı varsayılan uygulama ile aç"""
@@ -205,12 +708,12 @@ class FileTranslatorApp(ctk.CTk):
         """Üst panel ve rozetleri güncelle"""
         if self.current_directory:
             folder_name = os.path.basename(self.current_directory.rstrip(os.sep)) or self.current_directory
-            self.folder_badge_text.set(f"Klasör: {folder_name}\n{self.current_directory}")
+            self.folder_badge_text.set(f"{folder_name}\n{self.current_directory}")
         else:
-            self.folder_badge_text.set("Klasör: -")
+            self.folder_badge_text.set("Klasör seçilmedi")
 
         translated_count = len(self.translated_files)
-        self.translation_badge_text.set(f"Çevrilen dosya: {translated_count}")
+        self.translation_badge_text.set(f"{translated_count} çıktı")
 
     def open_usage_guide(self):
         """Kullanım kılavuzunu kullanıcıya aç"""
@@ -281,7 +784,7 @@ class FileTranslatorApp(ctk.CTk):
                 self.file_tree.selection_remove(self.file_tree.selection())
                 self.search_result_var.set("Sonuç bulunamadı")
         else:
-            self.search_result_var.set("Filtre: tüm dosyalar")
+            self.search_result_var.set("Tüm dosyalar görünür")
 
     def _iter_tree_items(self, tree, parent=""):
         """Treeview elemanları üzerinde dolaş"""
@@ -292,27 +795,31 @@ class FileTranslatorApp(ctk.CTk):
     def update_original_stats(self, content, encoding=None):
         """Orijinal içerik istatistiklerini güncelle"""
         content = content or ""
+        if not content:
+            self.original_stats_text.set("—")
+            return
         line_count = content.count("\n")
-        if content and not content.endswith("\n"):
+        if not content.endswith("\n"):
             line_count += 1
         char_count = len(content)
-
         if encoding:
             encoding_display = encoding.upper() if isinstance(encoding, str) else str(encoding)
-            info = f"Satır: {line_count}    Karakter: {char_count}    Kodlama: {encoding_display}"
+            info = f"{line_count} satır  ·  {char_count} karakter  ·  {encoding_display}"
         else:
-            info = f"Satır: {line_count}    Karakter: {char_count}"
+            info = f"{line_count} satır  ·  {char_count} karakter"
         self.original_stats_text.set(info)
 
     def update_translated_stats(self, content):
         """Çeviri önizleme istatistiklerini güncelle"""
         content = content or ""
+        if not content:
+            self.translated_stats_text.set("—")
+            return
         line_count = content.count("\n")
-        if content and not content.endswith("\n"):
+        if not content.endswith("\n"):
             line_count += 1
         char_count = len(content)
-        info = f"Satır: {line_count}    Karakter: {char_count}"
-        self.translated_stats_text.set(info)
+        self.translated_stats_text.set(f"{line_count} satır  ·  {char_count} karakter")
 
     def copy_original_to_clipboard(self):
         """Orijinal içeriği panoya kopyala"""
@@ -348,330 +855,14 @@ class FileTranslatorApp(ctk.CTk):
             if hasattr(self, "status_label"):
                 self.status_label.configure(text="DeepL anahtarı eksik!")
         
-    def create_left_panel(self):
-        """Sol panel - Orijinal dosya ağacı"""
-        self.left_frame = ctk.CTkFrame(self)
-        self.left_frame.grid(row=1, column=0, padx=(10, 5), pady=10, sticky="nsew")
-        self.left_frame.grid_rowconfigure(3, weight=1)
-        self.left_frame.grid_columnconfigure(0, weight=1)
-        
-        # Başlık ve klasör seçimi
-        header_frame = ctk.CTkFrame(self.left_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, columnspan=2, padx=10, pady=(10, 0), sticky="ew")
-        header_frame.grid_columnconfigure(0, weight=1)
-
-        title_label = ctk.CTkLabel(
-            header_frame,
-            text="Orijinal Dosyalar",
-            font=ctk.CTkFont(size=16, weight="bold")
-        )
-        title_label.grid(row=0, column=0, padx=(0, 10), pady=0, sticky="w")
-        
-        select_folder_btn = ctk.CTkButton(
-            header_frame,
-            text="Klasör Seç",
-            command=self.select_folder,
-            height=32
-        )
-        select_folder_btn.grid(row=0, column=1, padx=0, pady=0, sticky="e")
-
-        # Seçili klasör bilgisi
-        self.folder_path_label = ctk.CTkLabel(
-            self.left_frame,
-            textvariable=self.folder_badge_text,
-            anchor="w",
-            wraplength=260,
-            font=ctk.CTkFont(size=12),
-            text_color=("#334155", "#d0e2ff")
-        )
-        self.folder_path_label.grid(row=1, column=0, columnspan=2, padx=10, pady=(6, 0), sticky="ew")
-
-        # Arama ve filtre alanı
-        search_frame = ctk.CTkFrame(self.left_frame, fg_color="transparent")
-        search_frame.grid(row=2, column=0, columnspan=2, padx=10, pady=(10, 6), sticky="ew")
-        search_frame.grid_columnconfigure(0, weight=1)
-
-        self.search_entry = ctk.CTkEntry(
-            search_frame,
-            textvariable=self.search_var,
-            placeholder_text="Dosya veya klasör ara..."
-        )
-        self.search_entry.grid(row=0, column=0, padx=(0, 8), pady=0, sticky="ew")
-        self.search_entry.bind("<KeyRelease>", lambda event: self.apply_tree_search(self.search_var.get()))
-
-        clear_search_btn = ctk.CTkButton(
-            search_frame,
-            text="Temizle",
-            width=70,
-            height=30,
-            command=self.clear_search_query
-        )
-        clear_search_btn.grid(row=0, column=1, padx=(0, 8), pady=0)
-
-        refresh_btn = ctk.CTkButton(
-            search_frame,
-            text="Yenile",
-            width=70,
-            height=30,
-            command=self.refresh_current_folder
-        )
-        refresh_btn.grid(row=0, column=2, padx=0, pady=0)
-
-        search_result_label = ctk.CTkLabel(
-            search_frame,
-            textvariable=self.search_result_var,
-            anchor="w",
-            text_color=("#175cd3", "#8cb7ff"),
-            font=ctk.CTkFont(size=11)
-        )
-        search_result_label.grid(row=1, column=0, columnspan=3, pady=(6, 0), sticky="w")
-        
-        # Dosya ağacı
-        tree_frame = ctk.CTkFrame(self.left_frame)
-        tree_frame.grid(row=3, column=0, columnspan=2, padx=10, pady=(0, 10), sticky="nsew")
-        tree_frame.grid_rowconfigure(0, weight=1)
-        tree_frame.grid_columnconfigure(0, weight=1)
-        
-        # Treeview stili
-        self.setup_treeview_style()
-        
-        self.file_tree = ttk.Treeview(tree_frame, show="tree headings", columns=("type",))
-        self.file_tree.heading("#0", text="Dosya/Klasör")
-        self.file_tree.heading("type", text="Tür")
-        self.file_tree.column("type", width=80)
-        
-        # Scrollbar
-        scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.file_tree.yview)
-        self.file_tree.configure(yscrollcommand=scrollbar.set)
-        
-        self.file_tree.grid(row=0, column=0, sticky="nsew")
-        scrollbar.grid(row=0, column=1, sticky="ns")
-        self.update_match_tag_style()
-        
-        # Dosya seçme eventi
-        self.file_tree.bind("<<TreeviewSelect>>", self.on_file_select)
-        
-    def create_middle_left_panel(self):
-        """Orta-sol panel - Orijinal dosya içeriği"""
-        self.middle_left_frame = ctk.CTkFrame(self)
-        self.middle_left_frame.grid(row=1, column=1, padx=5, pady=10, sticky="nsew")
-        self.middle_left_frame.grid_rowconfigure(1, weight=1)
-        self.middle_left_frame.grid_columnconfigure(0, weight=1)
-        
-        # Başlık satırı
-        header_frame = ctk.CTkFrame(self.middle_left_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew")
-        header_frame.grid_columnconfigure(0, weight=1)
-
-        self.middle_left_title = ctk.CTkLabel(
-            header_frame,
-            text="Orijinal İçerik",
-            font=ctk.CTkFont(size=16, weight="bold")
-        )
-        self.middle_left_title.grid(row=0, column=0, sticky="w")
-
-        copy_original_btn = ctk.CTkButton(
-            header_frame,
-            text="Panoya Kopyala",
-            height=30,
-            command=self.copy_original_to_clipboard
-        )
-        copy_original_btn.grid(row=0, column=1, padx=(10, 0), sticky="e")
-        
-        # İçerik alanı
-        self.original_content = ctk.CTkTextbox(self.middle_left_frame)
-        self.original_content.configure(wrap="word")
-        self.original_content.grid(row=1, column=0, padx=10, pady=(6, 10), sticky="nsew")
-        self.original_content.bind("<KeyRelease>", lambda event: self.update_original_stats(self.original_content.get("1.0", "end-1c")))
-
-        stats_frame = ctk.CTkFrame(self.middle_left_frame, fg_color="transparent")
-        stats_frame.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="ew")
-
-        self.original_stats_label = ctk.CTkLabel(
-            stats_frame,
-            textvariable=self.original_stats_text,
-            anchor="w",
-            font=ctk.CTkFont(size=11)
-        )
-        self.original_stats_label.grid(row=0, column=0, sticky="w")
-        
-    def create_middle_right_panel(self):
-        """Orta-sağ panel - Çeviri önizleme"""
-        self.middle_right_frame = ctk.CTkFrame(self)
-        self.middle_right_frame.grid(row=1, column=2, padx=5, pady=10, sticky="nsew")
-        self.middle_right_frame.grid_rowconfigure(1, weight=1)
-        self.middle_right_frame.grid_columnconfigure(0, weight=1)
-        
-        header_frame = ctk.CTkFrame(self.middle_right_frame, fg_color="transparent")
-        header_frame.grid(row=0, column=0, padx=10, pady=(10, 0), sticky="ew")
-        header_frame.grid_columnconfigure(0, weight=1)
-
-        self.middle_right_title = ctk.CTkLabel(
-            header_frame,
-            text="Çeviri Önizleme",
-            font=ctk.CTkFont(size=16, weight="bold")
-        )
-        self.middle_right_title.grid(row=0, column=0, sticky="w")
-
-        copy_translated_btn = ctk.CTkButton(
-            header_frame,
-            text="Panoya Kopyala",
-            height=30,
-            command=self.copy_translated_to_clipboard
-        )
-        copy_translated_btn.grid(row=0, column=1, padx=(10, 0), sticky="e")
-        
-        # İçerik alanı
-        self.translated_preview = ctk.CTkTextbox(self.middle_right_frame, state="normal")
-        self.translated_preview.configure(wrap="word")
-        self.translated_preview.grid(row=1, column=0, padx=10, pady=(6, 10), sticky="nsew")
-        self.translated_preview.bind("<KeyRelease>", lambda event: self.update_translated_stats(self.translated_preview.get("1.0", "end-1c")))
-
-        stats_frame = ctk.CTkFrame(self.middle_right_frame, fg_color="transparent")
-        stats_frame.grid(row=2, column=0, padx=10, pady=(0, 10), sticky="ew")
-
-        self.translated_stats_label = ctk.CTkLabel(
-            stats_frame,
-            textvariable=self.translated_stats_text,
-            anchor="w",
-            font=ctk.CTkFont(size=11)
-        )
-        self.translated_stats_label.grid(row=0, column=0, sticky="w")
-        
-    def create_right_panel(self):
-        """Sağ panel - Çevrilmiş dosya ağacı"""
-        self.right_frame = ctk.CTkFrame(self)
-        self.right_frame.grid(row=1, column=3, padx=(5, 10), pady=10, sticky="nsew")
-        self.right_frame.grid_rowconfigure(1, weight=1)
-        self.right_frame.grid_columnconfigure(0, weight=1)
-        
-        # Başlık ve kontroller
-        title_container = ctk.CTkFrame(self.right_frame)
-        title_container.grid(row=0, column=0, padx=10, pady=10, sticky="ew")
-        title_container.grid_columnconfigure(0, weight=1)
-        
-        self.right_title = ctk.CTkLabel(title_container, text="Çevrilmiş Dosyalar", 
-                                       font=ctk.CTkFont(size=16, weight="bold"))
-        self.right_title.grid(row=0, column=0, padx=0, pady=0, sticky="w")
-        
-        badge_label = ctk.CTkLabel(
-            title_container,
-            textvariable=self.translation_badge_text,
-            font=ctk.CTkFont(size=12),
-            text_color=("#1d4ed8", "#8cb7ff")
-        )
-        badge_label.grid(row=1, column=0, sticky="w", pady=(6, 0))
-
-        # Temizle butonu
-        clear_btn = ctk.CTkButton(
-            title_container,
-            text="Temizle",
-            command=self.clear_translated_files,
-            height=28,
-            width=80
-        )
-        clear_btn.grid(row=0, column=1, padx=10, pady=0, sticky="e")
-        
-        # Çevrilmiş dosya ağacı
-        tree_container = ctk.CTkFrame(self.right_frame)
-        tree_container.grid(row=1, column=0, padx=10, pady=(0, 10), sticky="nsew")
-        tree_container.grid_rowconfigure(0, weight=1)
-        tree_container.grid_columnconfigure(0, weight=1)
-        
-        # Çevrilmiş dosyalar için Treeview
-        self.translated_tree = ttk.Treeview(tree_container, show="tree headings", columns=("status",))
-        self.translated_tree.heading("#0", text="Çevrilmiş Dosyalar")
-        self.translated_tree.heading("status", text="Durum")
-        self.translated_tree.column("status", width=80)
-        
-        # Scrollbar for translated tree
-        trans_scrollbar = ttk.Scrollbar(tree_container, orient="vertical", command=self.translated_tree.yview)
-        self.translated_tree.configure(yscrollcommand=trans_scrollbar.set)
-        
-        self.translated_tree.grid(row=0, column=0, sticky="nsew")
-        trans_scrollbar.grid(row=0, column=1, sticky="ns")
-        
-        # Çevrilmiş dosya seçme eventi
-        self.translated_tree.bind("<<TreeviewSelect>>", self.on_translated_file_select)
-        
-    def create_bottom_panel(self):
-        """Alt panel - Kontrol butonları"""
-        self.bottom_frame = ctk.CTkFrame(self)
-        self.bottom_frame.grid(row=2, column=0, columnspan=4, padx=10, pady=(0, 10), sticky="ew")
-        self.bottom_frame.grid_columnconfigure(9, weight=1)
-        
-        # Tema değiştirme
-        theme_label = ctk.CTkLabel(self.bottom_frame, text="Tema:")
-        theme_label.grid(row=0, column=0, padx=10, pady=10)
-        
-        self.theme_switch = ctk.CTkSwitch(self.bottom_frame, text="Dark/Light", command=self.toggle_theme)
-        self.theme_switch.grid(row=0, column=1, padx=10, pady=10)
-
-        # Kaynak dil seçimi
-        source_label = ctk.CTkLabel(self.bottom_frame, text="Kaynak Dil:")
-        source_label.grid(row=0, column=2, padx=(10, 5), pady=10)
-
-        self.source_lang_menu = ctk.CTkOptionMenu(
-            self.bottom_frame,
-            variable=self.source_lang_var,
-            values=list(self.source_languages.keys())
-        )
-        self.source_lang_menu.grid(row=0, column=3, padx=(0, 15), pady=10)
-
-        # Hedef dil seçimi
-        target_label = ctk.CTkLabel(self.bottom_frame, text="Hedef Dil:")
-        target_label.grid(row=0, column=4, padx=(5, 5), pady=10)
-
-        self.target_lang_menu = ctk.CTkOptionMenu(
-            self.bottom_frame,
-            variable=self.target_lang_var,
-            values=list(self.target_languages.keys())
-        )
-        self.target_lang_menu.grid(row=0, column=5, padx=(0, 20), pady=10)
-        
-        # Çeviri butonu
-        self.translate_btn = ctk.CTkButton(
-            self.bottom_frame,
-            text="Çevir",
-            command=self.handle_translation,
-            state="disabled",
-            height=40,
-            width=120
-        )
-        self.translate_btn.grid(row=0, column=6, padx=20, pady=10)
-        
-        # Tümünü çevir checkbox
-        self.translate_all_var = ctk.BooleanVar()
-        self.translate_all_checkbox = ctk.CTkCheckBox(
-            self.bottom_frame,
-            text="Tüm desteklenen dosyaları çevir",
-            variable=self.translate_all_var
-        )
-        self.translate_all_checkbox.grid(row=0, column=7, padx=20, pady=10)
-        
-        # Dışa aktarma butonu
-        self.export_btn = ctk.CTkButton(
-            self.bottom_frame,
-            text="Dışa Aktar",
-            command=self.export_files,
-            state="disabled",
-            height=40,
-            width=120
-        )
-        self.export_btn.grid(row=0, column=8, padx=20, pady=10)
-        
-        # Progress bar
-        self.progress_bar = ctk.CTkProgressBar(self.bottom_frame)
-        self.progress_bar.grid(row=0, column=9, padx=20, pady=10, sticky="ew")
-        self.progress_bar.set(0)
-        
-        # Status label
-        self.status_label = ctk.CTkLabel(self.bottom_frame, text="Dosya seçin...")
-        self.status_label.grid(row=0, column=10, padx=10, pady=10)
-        
     def select_folder(self):
         """Klasör seçme"""
-        folder_path = filedialog.askdirectory(title="Çeviri için klasör seçin")
+        # Proje kökünü varsayılan başlangıç dizini yap (frontend/ bir üstü)
+        proje_koku = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        folder_path = filedialog.askdirectory(
+            title="Çeviri için klasör seçin",
+            initialdir=proje_koku
+        )
         if folder_path:
             self.current_directory = folder_path
             self.populate_file_tree(folder_path)
@@ -691,7 +882,7 @@ class FileTranslatorApp(ctk.CTk):
         
         # Recursive olarak dosyaları ekle
         self._add_tree_items(root_item, root_path)
-        self.search_result_var.set("Filtre: tüm dosyalar")
+        self.search_result_var.set("Tüm dosyalar görünür")
         
     def _add_tree_items(self, parent, path):
         """Ağaca öğeleri ekleme"""
@@ -746,7 +937,7 @@ class FileTranslatorApp(ctk.CTk):
                     self.translate_btn.configure(state="disabled")
                     # İçeriği temizle
                     self.original_content.delete("1.0", "end")
-                    self.middle_left_title.configure(text="Orijinal İçerik")
+                    self.middle_left_title.configure(text="Dosya seçilmedi")
                     self.update_original_stats("")
             else:
                 if file_path:
@@ -758,7 +949,7 @@ class FileTranslatorApp(ctk.CTk):
                 self.translate_btn.configure(state="disabled")
                 # İçeriği temizle
                 self.original_content.delete("1.0", "end")
-                self.middle_left_title.configure(text="Orijinal İçerik")
+                self.middle_left_title.configure(text="Dosya seçilmedi")
                 self.update_original_stats("")
                 
     def get_file_path_from_tree(self, item):
@@ -792,40 +983,59 @@ class FileTranslatorApp(ctk.CTk):
         
     def load_file_content(self, file_path):
         """Dosya içeriğini yükleme"""
+        # Büyük dosya eşiği: 200 KB üstü için önizleme modu
+        BUYUK_DOSYA_ESIGI = 200_000
         try:
-            # Debug: Dosya yolunu kontrol et
             print(f"Dosya yükleniyor: {file_path}")
-            
-            # Dosyanın var olup olmadığını kontrol et
+
             if not os.path.exists(file_path):
                 self.status_label.configure(text="Dosya bulunamadı!")
                 return
-                
+
             if not os.path.isfile(file_path):
                 self.status_label.configure(text="Bu bir dosya değil!")
                 return
-            
-            # Dosya kodlamasını algıla
-            with open(file_path, 'rb') as f:
-                raw_data = f.read()
+
+            dosya_boyutu = os.path.getsize(file_path)
+
+            if dosya_boyutu > BUYUK_DOSYA_ESIGI:
+                # Büyük dosya: sadece ilk 4KB ile encoding algıla, widget'a tam içerik koyma
+                with open(file_path, 'rb') as f:
+                    orneklem = f.read(4096)
+                result = chardet.detect(orneklem)
+                encoding = result['encoding'] or 'utf-8'
+                self._large_file_encoding = encoding
+
+                ozet = (
+                    f"[BÜYÜK DOSYA - ÖNİZLEME DEVRE DIŞI]\n"
+                    f"Dosya: {os.path.basename(file_path)}\n"
+                    f"Boyut: {dosya_boyutu / 1024:.1f} KB\n"
+                    f"Kodlama: {encoding}\n\n"
+                    f"Dosya çok büyük olduğu için önizleme gösterilmiyor.\n"
+                    f"'Çevir' butonuna basarak çeviriyi başlatabilirsiniz."
+                )
+                self.original_content.delete("1.0", "end")
+                self.original_content.insert("1.0", ozet)
+                self.middle_left_title.configure(text=f"{os.path.basename(file_path)}  ·  büyük dosya")
+                self.update_original_stats(ozet, encoding)
+                print(f"Büyük dosya modu: {dosya_boyutu:,} bayt — önizleme atlandı")
+            else:
+                # Normal dosya: tam içeriği yükle
+                self._large_file_encoding = None
+                with open(file_path, 'rb') as f:
+                    raw_data = f.read()
                 result = chardet.detect(raw_data)
                 encoding = result['encoding'] or 'utf-8'
-            
-            # Dosyayı oku
-            with open(file_path, 'r', encoding=encoding) as f:
-                content = f.read()
-                
-            # İçeriği temizle ve yeni içeriği ekle
-            self.original_content.delete("1.0", "end")
-            self.original_content.insert("1.0", content)
-            
-            # Başlığı güncelle
-            self.middle_left_title.configure(text=f"Orijinal: {os.path.basename(file_path)}")
-            self.update_original_stats(content, encoding)
-            
-            # Debug: Başarılı yükleme
-            print(f"Dosya başarıyla yüklendi. İçerik uzunluğu: {len(content)} karakter")
-            
+
+                with open(file_path, 'r', encoding=encoding) as f:
+                    content = f.read()
+
+                self.original_content.delete("1.0", "end")
+                self.original_content.insert("1.0", content)
+                self.middle_left_title.configure(text=os.path.basename(file_path))
+                self.update_original_stats(content, encoding)
+                print(f"Dosya yüklendi: {len(content):,} karakter")
+
         except Exception as e:
             error_msg = f"Dosya okunamadı: {str(e)}\nDosya yolu: {file_path}"
             print(error_msg)
@@ -834,55 +1044,69 @@ class FileTranslatorApp(ctk.CTk):
             self.update_original_stats("")
             
     def translate_file(self):
-        """Dosya çevirisi"""
+        """Dosya çevirisi - ağır işlemi arka plan thread'inde çalıştır"""
         if not self.selected_file:
             return
-            
+
         self.progress_bar.set(0.1)
         self.status_label.configure(text="Çeviri yapılıyor...")
-        
-        # İçeriği al
-        content = self.original_content.get("1.0", "end-1c")
-        
-        # Çeviri işlemi
-        self.progress_bar.set(0.5)
-        try:
-            translated = self._perform_translation(content, self.selected_file)
-        except Exception as e:
-            self.progress_bar.set(0)
-            self.status_label.configure(text="Çeviri başarısız!")
-            messagebox.showerror("Çeviri Hatası", str(e))
-            return
-        
-        # Çeviri önizlemesini güncelle
+        self.translate_btn.configure(state="disabled")
+
+        dosya_yolu = self.selected_file
+
+        # Büyük dosyada widget yerine diskten oku
+        buyuk_dosya_modu = getattr(self, '_large_file_encoding', None) is not None
+        if buyuk_dosya_modu:
+            encoding = self._large_file_encoding
+            try:
+                with open(dosya_yolu, 'r', encoding=encoding) as f:
+                    content = f.read()
+            except Exception as hata:
+                self._ceviri_hatasi(hata)
+                return
+        else:
+            content = self.original_content.get("1.0", "end-1c")
+
+        def _arka_planda_cevir():
+            try:
+                cevrilmis = self._perform_translation(content, dosya_yolu)
+                self.after(0, lambda: self._ceviri_tamamlandi(cevrilmis, dosya_yolu))
+            except Exception as hata:
+                self.after(0, lambda: self._ceviri_hatasi(hata))
+
+        threading.Thread(target=_arka_planda_cevir, daemon=True).start()
+
+    def _ceviri_tamamlandi(self, translated, dosya_yolu):
+        """Arka plan çevirisi bitince UI'yi güncelle"""
         self.translated_preview.delete("1.0", "end")
         self.translated_preview.insert("1.0", translated)
-        self.middle_right_title.configure(text=f"Çeviri: {os.path.basename(self.selected_file)}")
+        self.middle_right_title.configure(text=os.path.basename(dosya_yolu))
         self.update_translated_stats(translated)
-        
-        # Çevrilmiş dosyayı kaydet
-        self.translated_files[self.selected_file] = translated
-        
-        # Çevrilmiş dosyalar ağacını güncelle
+
+        self.translated_files[dosya_yolu] = translated
         self.update_translated_files_tree()
         self.update_header_stats()
-        
+
         self.progress_bar.set(1.0)
         self.export_btn.configure(state="normal")
+        self.translate_btn.configure(state="normal")
         self.status_label.configure(text="Çeviri tamamlandı!")
-        
-        # Yeni çevrilmiş dosyayı otomatik seç
-        filename = os.path.basename(self.selected_file)
+
+        filename = os.path.basename(dosya_yolu)
         for item in self.translated_tree.get_children():
-            item_text = self.translated_tree.item(item, "text")
-            if filename in item_text:
+            if filename in self.translated_tree.item(item, "text"):
                 self.translated_tree.selection_set(item)
-                # Manuel olarak seçim eventini tetikle
                 self.on_translated_file_select(None)
                 break
-        
-        # Progress bar'ı sıfırla
+
         self.after(2000, lambda: self.progress_bar.set(0))
+
+    def _ceviri_hatasi(self, hata):
+        """Arka plan çevirisi hata verince UI'yi güncelle"""
+        self.progress_bar.set(0)
+        self.translate_btn.configure(state="normal")
+        self.status_label.configure(text="Çeviri başarısız!")
+        messagebox.showerror("Çeviri Hatası", str(hata))
         
     def _perform_translation(self, content, file_path=None):
         """Seçili dilleri kullanarak DeepL üzerinden çeviri yap"""
@@ -1012,6 +1236,10 @@ class FileTranslatorApp(ctk.CTk):
             result += '\n'
         return result
 
+    # Her JSON çeviri oturumunda kullanılacak karakter bütçesi
+    # DeepL ücretsiz tier: 500,000 / ay — güvenli marj bırakarak 490,000 ayarlandı
+    KARAKTER_LIMITI = 490_000
+
     def _translate_json_content(self, content, source_code, target_code):
         trailing_newline = content.endswith('\n')
         try:
@@ -1024,8 +1252,26 @@ class FileTranslatorApp(ctk.CTk):
                 preserve_formatting=True,
             )
 
-        references = []
-        self._collect_json_string_nodes(data, references)
+        if isinstance(data, str):
+            translated = self.translation_client.translate_text(
+                data,
+                target_lang=target_code,
+                source_lang=source_code,
+                preserve_formatting=True,
+            )
+            if isinstance(translated, list):
+                translated = translated[0] if translated else ""
+            result = json.dumps(translated, ensure_ascii=False, indent=4)
+            if trailing_newline and not result.endswith('\n'):
+                result += '\n'
+            return result
+
+        # Liste ise her kaydın karakter maliyetini hesapla, bütçe dolana kadar çevir
+        if isinstance(data, list):
+            references = self._butce_dahilinde_referanslar_topla(data, target_code)
+        else:
+            references = []
+            self._collect_json_string_nodes(data, references)
 
         if references:
             original_values = [value for (_, _, value) in references]
@@ -1050,17 +1296,126 @@ class FileTranslatorApp(ctk.CTk):
             result += '\n'
         return result
 
+    # Hedef dil karakterleri — her dile özgü ünik karakterler (devam çevirisi tespiti için)
+    _HEDEF_DIL_KARAKTERLERI = {
+        'TR': frozenset('ğüşıöçĞÜŞİÖÇ'),
+        'DE': frozenset('äöüÄÖÜß'),
+        'FR': frozenset('éàêèùûîôâœæçÉÀÊÈÙÛÎÔÂŒÆÇ'),
+        'ES': frozenset('áéíóúüñ¿¡ÁÉÍÓÚÜÑ'),
+        'PT-BR': frozenset('ãõáéíóúâêôàçÃÕÁÉÍÓÚÂÊÔÀÇ'),
+        'PT-PT': frozenset('ãõáéíóúâêôàçÃÕÁÉÍÓÚÂÊÔÀÇ'),
+        'IT': frozenset('àèéìíîóòùúÀÈÉÌÍÎÓÒÙÚ'),
+        'PL': frozenset('ąćęłńóśźżĄĆĘŁŃÓŚŹŻ'),
+        'RU': frozenset('абвгдеёжзийклмнопрстуфхцчшщъыьэюя'
+                        'АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯ'),
+    }
+
+    def _kayit_hedef_dilde_mi(self, item, target_code):
+        """Kaydın çevrilebilir alanları hedef dil karakterleri içeriyor mu?
+        Evet ise bu kayıt daha önce çevrilmiş sayılır."""
+        hedef_chars = self._HEDEF_DIL_KARAKTERLERI.get(target_code, frozenset())
+
+        # CJK (Japonca, Çince, Korece) — Unicode aralığı kontrolU
+        cjk_hedef = target_code in ('JA', 'ZH', 'KO')
+
+        if not hedef_chars and not cjk_hedef:
+            return False  # Bilinmeyen dil — atla
+
+        refs = []
+        if isinstance(item, (dict, list)):
+            self._collect_json_string_nodes(item, refs)
+        elif isinstance(item, str):
+            refs = [(None, None, item)]
+
+        for (_, _, value) in refs:
+            if hedef_chars and any(c in hedef_chars for c in value):
+                return True
+            if cjk_hedef and any('\u4e00' <= c <= '\u9fff' or '\u3040' <= c <= '\u30ff' for c in value):
+                return True
+        return False
+
+    def _butce_dahilinde_referanslar_topla(self, liste, target_code=None):
+        """Her öğenin çeviri durumunu ve karakter maliyetini hesapla.
+        Zaten çevrilmiş olanları atla, kalanı bütçe dahilinde çevir.
+        Dosya yeniden yüklendiğinde kaldığı yerden devam eder."""
+        butce_kalan = self.KARAKTER_LIMITI
+        referanslar = []
+        zaten_cevrilmis = 0
+        cevrilecek = 0
+        butce_yetersiz = 0
+
+        for i, item in enumerate(liste):
+            # Hedef dil karakterleri varsa bu kayıt daha önce çevrilmiş — atla
+            if target_code and self._kayit_hedef_dilde_mi(item, target_code):
+                zaten_cevrilmis += 1
+                continue
+
+            # Bu öğenin çevrilebilir karakter maliyetini hesapla
+            item_refs = []
+            if isinstance(item, (dict, list)):
+                self._collect_json_string_nodes(item, item_refs)
+            elif isinstance(item, str) and not self._is_untranslatable_string(item):
+                item_refs.append((liste, i, item))
+
+            item_karakter = sum(len(v) for (_, _, v) in item_refs)
+            if item_karakter == 0:
+                continue  # Çevrilebilir metin yok
+
+            if butce_kalan >= item_karakter:
+                butce_kalan -= item_karakter
+                referanslar.extend(item_refs)
+                cevrilecek += 1
+            else:
+                butce_yetersiz += 1
+
+        toplam = len(liste)
+        print(f"[INFO] Toplam: {toplam} — "
+              f"Zaten çevrilmiş: {zaten_cevrilmis}, "
+              f"Bu çalışmada çevrilecek: {cevrilecek}, "
+              f"Bütçe yetersiz: {butce_yetersiz}")
+        return referanslar
+
+    # Anahtar ismine göre hiçbir zaman çevrilmeyecek JSON alanları
+    # contentHtml -> contentText'in HTML kopyası, fazladan karakter
+    # $date       -> ISO zaman damgası
+    # components  -> V, S, M gibi oyun mekaniği kodları
+    _ATLANACAK_JSON_ANAHTARLARI = frozenset({'contentHtml', '$date', 'components'})
+
+    def _is_untranslatable_string(self, value: str) -> bool:
+        """URL, ObjectId, slug ve ISO tarih gibi çevrilmemesi gereken değerleri filtrele"""
+        import re
+        if not value or not value.strip():
+            return True
+        # URL değerleri çevrilmez
+        if value.startswith(('http://', 'https://')):
+            return True
+        # MongoDB ObjectId (24 hex karakter)
+        if re.match(r'^[0-9a-f]{24}$', value):
+            return True
+        # ISO tarih/zaman damgası (2024-01-15T00:00:00.000Z vb.)
+        if re.match(r'^\d{4}-\d{2}-\d{2}', value):
+            return True
+        # Boşluk içermeyen saf slug/kod değerleri (acid-splash, EN_US vb.)
+        if re.match(r'^[a-z0-9][a-z0-9_\-]*$', value) and ' ' not in value and len(value) < 60:
+            return True
+        return False
+
     def _collect_json_string_nodes(self, obj, references):
         if isinstance(obj, dict):
             for key, value in obj.items():
+                # Anahtar ismine göre bazı alanları tamamen atla
+                if key in self._ATLANACAK_JSON_ANAHTARLARI:
+                    continue
                 if isinstance(value, str):
-                    references.append((obj, key, value))
+                    if not self._is_untranslatable_string(value):
+                        references.append((obj, key, value))
                 elif isinstance(value, (dict, list)):
                     self._collect_json_string_nodes(value, references)
         elif isinstance(obj, list):
             for index, item in enumerate(obj):
                 if isinstance(item, str):
-                    references.append((obj, index, item))
+                    if not self._is_untranslatable_string(item):
+                        references.append((obj, index, item))
                 elif isinstance(item, (dict, list)):
                     self._collect_json_string_nodes(item, references)
         
@@ -1141,7 +1496,7 @@ class FileTranslatorApp(ctk.CTk):
         if last_success_path:
             self.translated_preview.delete("1.0", "end")
             self.translated_preview.insert("1.0", last_translated_content)
-            self.middle_right_title.configure(text=f"Çeviri: {os.path.basename(last_success_path)}")
+            self.middle_right_title.configure(text=os.path.basename(last_success_path))
             self.update_translated_stats(last_translated_content)
 
         # Çevrilmiş dosyalar ağacını güncelle
@@ -1176,14 +1531,14 @@ class FileTranslatorApp(ctk.CTk):
                 translated_content = self.translated_files[original_path]
                 self.translated_preview.delete("1.0", "end")
                 self.translated_preview.insert("1.0", translated_content)
-                self.middle_right_title.configure(text=f"Çeviri: {clean_filename}")
+                self.middle_right_title.configure(text=clean_filename)
                 self.update_translated_stats(translated_content)
                 
                 print(f"Çevrilmiş dosya seçildi: {clean_filename}")
                 print(f"İçerik uzunluğu: {len(translated_content)} karakter")
             else:
                 self.translated_preview.delete("1.0", "end")
-                self.middle_right_title.configure(text="Çeviri Önizleme")
+                self.middle_right_title.configure(text="Henüz çeviri yok")
                 print(f"Çevrilmiş dosya bulunamadı: {clean_filename}")
                 self.update_translated_stats("")
                 
@@ -1211,7 +1566,7 @@ class FileTranslatorApp(ctk.CTk):
                 icon = "📄"
                 
             tree_item = self.translated_tree.insert("", "end", text=f"{icon} {filename}", 
-                                       values=("✅ Çevrildi",))
+                                       values=("hazır",))
             print(f"Çevrilmiş dosya eklendi: {icon} {filename}")
 
         self.update_header_stats()
@@ -1224,7 +1579,7 @@ class FileTranslatorApp(ctk.CTk):
                 self.translated_files.clear()
                 self.update_translated_files_tree()
                 self.translated_preview.delete("1.0", "end")
-                self.middle_right_title.configure(text="Çeviri Önizleme")
+                self.middle_right_title.configure(text="Henüz çeviri yok")
                 self.export_btn.configure(state="disabled")
                 self.status_label.configure(text="Çevrilmiş dosyalar temizlendi")
                 self.update_translated_stats("")
@@ -1284,72 +1639,70 @@ class FileTranslatorApp(ctk.CTk):
             except Exception as e:
                 messagebox.showerror("Hata", f"Dışa aktarma hatası: {str(e)}")
                 
+
     def toggle_theme(self):
-        """Tema değiştirme"""
+        """Açık/koyu yüzey değişimi"""
         if self.theme_switch.get():
-            ctk.set_appearance_mode("light")
-            self.update_treeview_style("light")
-        else:
             ctk.set_appearance_mode("dark")
+            self.configure(fg_color="#12100E")
             self.update_treeview_style("dark")
-            
+            self._yuzeyleri_koyu_yap()
+        else:
+            ctk.set_appearance_mode("light")
+            self.configure(fg_color=Tema.tuval)
+            self.update_treeview_style("light")
+            self._yuzeyleri_acik_yap()
+
+    def _yuzeyleri_acik_yap(self):
+        """Açık atölye paletini uygula"""
+        if hasattr(self, "middle_left_frame"):
+            self.middle_left_frame.configure(fg_color=Tema.yuzey)
+            self.middle_right_frame.configure(fg_color=Tema.yuzey)
+            self.original_content.configure(fg_color=Tema.editor, text_color=Tema.mucur)
+            self.translated_preview.configure(fg_color=Tema.editor, text_color=Tema.mucur)
+            self.bottom_frame.configure(fg_color=Tema.yuzey)
+            self.status_label.configure(text_color=Tema.soluk)
+            self.middle_left_title.configure(text_color=Tema.mucur)
+            self.middle_right_title.configure(text_color=Tema.mucur)
+
+    def _yuzeyleri_koyu_yap(self):
+        """Koyu atölye paletini uygula"""
+        if hasattr(self, "middle_left_frame"):
+            self.middle_left_frame.configure(fg_color="#1A1816")
+            self.middle_right_frame.configure(fg_color="#1A1816")
+            self.original_content.configure(fg_color=Tema.editor_koyu, text_color="#F5F0E8")
+            self.translated_preview.configure(fg_color=Tema.editor_koyu, text_color="#F5F0E8")
+            self.bottom_frame.configure(fg_color="#171412")
+            self.status_label.configure(text_color=Tema.ray_soluk)
+            self.middle_left_title.configure(text_color="#F5F0E8")
+            self.middle_right_title.configure(text_color="#F5F0E8")
+
     def update_treeview_style(self, mode):
         """TreeView stillerini tema değişikliğine göre güncelle"""
-        style = ttk.Style()
-        
-        if mode == "light":
-            # Light mode renkleri
-            style.configure("Treeview",
-                           background="white",
-                           foreground="black",
-                           rowheight=25,
-                           fieldbackground="white")
-            style.configure("Treeview.Heading",
-                           background="#e0e0e0",
-                           foreground="black",
-                           relief="flat")
-            style.map("Treeview",
-                     background=[('selected', '#0078d4')])
-        else:
-            # Dark mode renkleri
-            style.configure("Treeview",
-                           background="#2b2b2b",
-                           foreground="white",
-                           rowheight=25,
-                           fieldbackground="#2b2b2b")
-            style.configure("Treeview.Heading",
-                           background="#1f538d",
-                           foreground="white",
-                           relief="flat")
-            style.map("Treeview",
-                     background=[('selected', '#1f538d')])
-        
-        # TreeView'ları yeniden çiz
-        if hasattr(self, 'file_tree'):
+        self.setup_treeview_style(mode)
+        if hasattr(self, "file_tree"):
             self.file_tree.update()
-        if hasattr(self, 'translated_tree'):
+        if hasattr(self, "translated_tree"):
             self.translated_tree.update()
-
         self.update_match_tag_style(mode)
 
     def update_match_tag_style(self, mode=None):
         """Dosya ağacı eşleşme etiketi renklerini güncelle"""
-        if not hasattr(self, 'file_tree'):
+        if not hasattr(self, "file_tree"):
             return
-
         if mode is None:
-            mode = (ctk.get_appearance_mode() or "dark").lower()
+            mode = (ctk.get_appearance_mode() or "light").lower()
         else:
             mode = str(mode).lower()
-
         if mode == "light":
-            match_bg = "#cfe3ff"
-            match_fg = "#0f172a"
+            self.file_tree.tag_configure(
+                "match", background=Tema.eslesme_acik, foreground=Tema.mucur
+            )
         else:
-            match_bg = "#1f6aa5"
-            match_fg = "white"
+            self.file_tree.tag_configure(
+                "match", background=Tema.eslesme_koyu, foreground="#FED7AA"
+            )
 
-        self.file_tree.tag_configure("match", background=match_bg, foreground=match_fg)
 
 if __name__ == "__main__":
     app = FileTranslatorApp()
